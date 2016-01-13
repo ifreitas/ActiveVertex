@@ -1,0 +1,31 @@
+*.class
+*.log
+classes
+.cache
+tags
+.tags
+.cache-main
+.cache-tests
+
+# sbt specific
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/target/
+project/project/
+project/plugins/project/
+.lib
+
+# Scala-IDE specific
+.scala_dependencies
+
+# eclipse files
+.classpath
+.project
+.settings
+*.swp
+.lib-src
+
+/bin/
