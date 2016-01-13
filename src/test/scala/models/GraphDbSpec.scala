@@ -1,14 +1,16 @@
 package models
 
+import java.util.UUID
+import scala.collection.JavaConversions._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Success
 import scala.util.Failure
-import framework.db.GraphDb
 import com.thinkaurelius.titan.core.Cardinality
-import scala.collection.JavaConversions._
 import com.thinkaurelius.titan.core.TitanTransaction
-import java.util.UUID
+import gremlin.scala.ScalaGraph
+import gremlin.scala.Key
+import framework.db.GraphDb
 
 class GraphDbSpec extends BaseSpec {
   
@@ -25,10 +27,10 @@ class GraphDbSpec extends BaseSpec {
       "can be operated by multiple threads" in {
         // Creates four vertices concurrently within a single transaction.
         val futureBeatles = GraphDb.transaction { transactionalGraph =>
-          val futureJohn   = Future { transactionalGraph.addVertex() }
-          val futurePaul   = Future { transactionalGraph.addVertex() }
-          val futureRingo  = Future { transactionalGraph.addVertex() }
-          val futureGeorge = Future { transactionalGraph.addVertex() }
+          val futureJohn   = Future { transactionalGraph.addVertex("person", ("name", "John"))  }
+          val futurePaul   = Future { transactionalGraph.addVertex("person", ("name", "Paul"))  }
+          val futureRingo  = Future { transactionalGraph.addVertex("person", ("name", "Ringo")) }
+          val futureGeorge = Future { transactionalGraph.addVertex("person", ("name", "George"))}
           
           for {
           	john   <- futureJohn
@@ -46,7 +48,7 @@ class GraphDbSpec extends BaseSpec {
         // when it finishes the creation, it checks the presence of ids through a new transaction
         whenReady(futureBeatles){ ids =>
           val futureSavedIds = GraphDb.transaction { transactionalGraph =>
-            Future{ transactionalGraph.query().vertices().iterator().toList.map{ _.id.toString.toLong } }
+            Future{ transactionalGraph.V.toList().map{ _.id.toString.toLong } }
           }
           whenReady(futureSavedIds){ savedIds =>
             savedIds must contain allOf (ids._1, ids._2, ids._3, ids._4)
@@ -59,13 +61,13 @@ class GraphDbSpec extends BaseSpec {
       
        "on Success" must {
          "closes the transaction" in {
-           var transaction:TitanTransaction = null
+           var transaction:ScalaGraph[TitanTransaction] = null
            val futureOperation = GraphDb.transaction { transactionalGraph =>
         			transaction = transactionalGraph
-        			transaction mustBe 'open
+        			transaction.graph mustBe 'open
         			Future.successful{"fim"}
             }// commit
-            whenReady(futureOperation){ _ => transaction mustBe 'closed }
+            whenReady(futureOperation){ _ => transaction.graph mustBe 'closed }
           }
          
          "commits the changes" in {
@@ -74,7 +76,7 @@ class GraphDbSpec extends BaseSpec {
            }
            whenReady(futureId){ id =>
              val futureSavedIds = GraphDb.transaction { transactionalGraph =>
-               Future{transactionalGraph.query().vertices().iterator().toList.map(_.id)}
+               Future{transactionalGraph.V.toList.map(_.id)}
              }
              whenReady(futureSavedIds){ savedIds =>
                savedIds must contain (id)
@@ -85,28 +87,28 @@ class GraphDbSpec extends BaseSpec {
        
        "on Failure" must {
         "closes the transaction"  in {
-          var transaction:TitanTransaction = null
+          var transaction:ScalaGraph[TitanTransaction] = null
           val futureOperation = GraphDb.transaction { transactionalGraph =>
       			transaction = transactionalGraph
-      			transaction mustBe 'open
+      			transaction.graph mustBe 'open
       			Future.failed(new RuntimeException)
           }
-          whenReady(futureOperation.failed){ _ => transaction mustBe 'closed }
+          whenReady(futureOperation.failed){ _ => transaction.graph mustBe 'closed }
         }
         "rollbacks the changes" in {
           val randomName = UUID.randomUUID.toString
+          val nameField  = Key[String]("name")
           
           // Case 1 - throwing an exception immediately after the vertex creation
           val future = GraphDb.transaction { transactionalGraph =>
             Future{
-              val vertex = transactionalGraph.addVertex()
-              vertex.property("name", randomName)
+              val vertex = transactionalGraph.addVertex("person", ("name", randomName))
               throw new RuntimeException
             }
           }
           whenReady(future.failed){ e =>
             val futureListWithRandomName = GraphDb.transaction { transactionalGraph =>
-              Future{transactionalGraph.query().has("name", randomName).vertices.iterator().toList}
+              Future{transactionalGraph.V.has(nameField, randomName).toList}
             }
             whenReady(futureListWithRandomName){ vertexListWithRandomName =>
               vertexListWithRandomName mustBe 'empty
@@ -116,8 +118,7 @@ class GraphDbSpec extends BaseSpec {
           // Case 2 - wait for the completion of the vertex creation, before throws an exception
           val futureCase2 = GraphDb.transaction { transactionalGraph =>
             val futureVertex = Future{
-              val vertex = transactionalGraph.addVertex()
-              vertex.property("name", randomName)
+              val vertex = transactionalGraph.addVertex("person", ("name", randomName))
               vertex
             }
             for{ vertex <- futureVertex }
@@ -125,7 +126,7 @@ class GraphDbSpec extends BaseSpec {
           }
           whenReady(futureCase2.failed){ e =>
             val futureListWithRandomName = GraphDb.transaction { transactionalGraph =>
-              Future{transactionalGraph.query().has("name", randomName).vertices.iterator().toList}
+              Future{transactionalGraph.V.has(nameField, randomName).toList}
             }
             whenReady(futureListWithRandomName){ listWithRandomName =>
               listWithRandomName mustBe 'empty
@@ -134,13 +135,13 @@ class GraphDbSpec extends BaseSpec {
           
           // Case 3 - wait for the completion of the vertex creation, before return a failed future
           val futureCase3 = GraphDb.transaction { transactionalGraph =>
-            transactionalGraph.addVertex().property("name", randomName)
+            transactionalGraph.addVertex("person", ("name", randomName))
             Thread.sleep(2000) // wait the vertex creation and update
             Future.failed(new RuntimeException)
           }
           whenReady(futureCase3.failed){ e =>
             val futureListWithRandomName = GraphDb.transaction { transactionalGraph =>
-              Future{transactionalGraph.query().has("name", randomName).vertices.iterator().toList}
+              Future{transactionalGraph.V.has(nameField, randomName).toList}
             }
             whenReady(futureListWithRandomName){ listWithRandomName =>
               listWithRandomName mustBe 'empty

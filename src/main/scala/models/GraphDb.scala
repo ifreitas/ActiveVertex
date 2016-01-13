@@ -1,24 +1,21 @@
 package framework.db
 
-import com.thinkaurelius.titan.core.TitanGraph
-import com.thinkaurelius.titan.core.TitanFactory
-import com.thinkaurelius.titan.core.TitanTransaction
 import org.apache.commons.configuration.BaseConfiguration
-import gremlin.scala._
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext
-import scala.util.Try
-import scala.util.Success
-import scala.util.Failure
+import com.thinkaurelius.titan.core.TitanFactory
+import com.thinkaurelius.titan.core.TitanGraph
 import com.thinkaurelius.titan.core.schema.TitanManagement
+import com.thinkaurelius.titan.core.TitanTransaction
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.util.Failure
+import scala.util.Success
+import gremlin.scala._
 
 /**
  * @author Israel Freitas
  */
 object GraphDb {
   private var titan: TitanGraph = _;
-//  private var gremlin: ScalaGraph[TitanGraph] = _;
   
   // TODO: Externalizar a configuração
   private def getTitanConf = {
@@ -34,13 +31,6 @@ object GraphDb {
     titan
   }
   
-//  private def getGremlinConnection = {
-//    if(gremlin == null || titan.isClosed()){
-//      gremlin = getConnection.asScala
-//    }
-//    gremlin
-//  }
-  
   def init(){
 	  getConnection
 	  println("Titan's connection opened.")
@@ -51,7 +41,6 @@ object GraphDb {
     println("closing Titan's connection...")
     getConnection.close
     titan = null
-//    gremlin = null
     println("Titan's connection closed.")
   }
   
@@ -74,14 +63,13 @@ object GraphDb {
    *     - must closes the transaction
    *     - must rollbacks the changes
    */
-  def transaction[T](block: TitanTransaction => Future[T])(implicit ec:ExecutionContext): Future[T] = {
+  def transaction[T](block: ScalaGraph[TitanTransaction] => Future[T])(implicit ec:ExecutionContext): Future[T] = {
 	  for {
-	    transactionalGraph <- Future{getConnection.newTransaction}
+	    transactionalGraph <- Future { getConnection.newTransaction.asScala }
 	    operation          <- block(transactionalGraph).andThen{
-                      	      case Success(r) => transactionalGraph.commit
-                      	      case Failure(e) => transactionalGraph.rollback
+                      	      case Success(r) => transactionalGraph.graph.commit
+                      	      case Failure(e) => transactionalGraph.graph.rollback
 	                          }
 	  }yield{operation}
   }
-
 }
