@@ -1,4 +1,4 @@
-package framework.db
+package models
 
 import org.apache.commons.configuration.BaseConfiguration
 import com.thinkaurelius.titan.core.TitanFactory
