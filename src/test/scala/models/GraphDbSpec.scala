@@ -10,17 +10,10 @@ import com.thinkaurelius.titan.core.Cardinality
 import com.thinkaurelius.titan.core.TitanTransaction
 import gremlin.scala.ScalaGraph
 import gremlin.scala.Key
-import framework.db.GraphDb
+import org.scalatest.DoNotDiscover
 
+@DoNotDiscover
 class GraphDbSpec extends BaseSpec {
-  
-  override def beforeAll{ 
-    GraphDb.init 
-    GraphDb.createSchema { schema =>
-    	schema.makeVertexLabel("person").make()
-    	schema.makePropertyKey("name").dataType(classOf[String]).cardinality(Cardinality.SINGLE).make()
-    }
-  }
   
   "transaction" must {
     "provides a transactional graph," which {
