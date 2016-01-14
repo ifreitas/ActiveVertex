@@ -11,7 +11,8 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
 import com.thinkaurelius.titan.core.TitanTransaction
 
-
+// Thanks to piotrga. From: http://stackoverflow.com/questions/11020746/get-companion-object-instance-with-new-scala-reflection-api
+// and https://gist.github.com/piotrga/5928581 
 trait ReflectionSugars{
   private lazy val universeMirror = ru.runtimeMirror(getClass.getClassLoader)
   protected def companionOf[T](implicit tt: ru.TypeTag[T])  = {
