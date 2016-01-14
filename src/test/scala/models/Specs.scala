@@ -9,7 +9,7 @@ class Specs extends Spec with BeforeAndAfterAll{
   override def nestedSuites = Vector(new GraphDbSpec, new ActiveRecordSpec)
   
   override def beforeAll{ 
-    GraphDb.init
+    GraphDb.init()
     GraphDb.createSchema { schema =>
       schema.makeVertexLabel("person").make
       schema.makePropertyKey("name").cardinality(Cardinality.SINGLE).dataType(classOf[String]).make

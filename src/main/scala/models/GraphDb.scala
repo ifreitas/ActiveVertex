@@ -16,25 +16,19 @@ import gremlin.scala._
  */
 object GraphDb {
   private var titan: TitanGraph = _;
+  private def getConnection = titan
   
-  // TODO: Externalizar a configuração
-  private def getTitanConf = {
+  private lazy val defaultConfiguration = {
     val conf = new BaseConfiguration()
     conf.setProperty("storage.backend", "inmemory")
     conf
   }
   
-  private def getConnection = {
-    if(titan == null || titan.isClosed()){
-      titan = TitanFactory.open(getTitanConf)
-    }
-    titan
-  }
-  
-  def init(){
-	  getConnection
+  def init(config:BaseConfiguration = defaultConfiguration){
+	  if(titan == null || titan.isClosed()){
+		  titan = TitanFactory.open(config)
+	  }
 	  println("Titan's connection opened.")
-	  ()
   }
   
   def shutdown(){
