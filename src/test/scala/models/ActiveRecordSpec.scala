@@ -14,14 +14,17 @@ import scala.util.Failure
 
 object Person extends CompanionActiveRecord[Person]
 case class Person(name:String, age:Int, homePage:Option[String]=None) extends ActiveRecord[Person]{
-  def validate(){}
+  override def validate(){
+    validate("name", name, required)
+    validate("age", age, minValue(18))
+  }
 }
 
 object PersonWhoCrashsOnBeforeSave extends CompanionActiveRecord[PersonWhoCrashsOnBeforeSave]{
 	override def beforeSave (db:ScalaGraph[TitanTransaction]):Future[Unit]=Future.failed(new RuntimeException)
 }
 case class PersonWhoCrashsOnBeforeSave(name:String, age:Int, homePage:Option[String]=None) extends ActiveRecord[PersonWhoCrashsOnBeforeSave]{
-  def validate(){}
+  override def validate(){}
 }
 
 @DoNotDiscover

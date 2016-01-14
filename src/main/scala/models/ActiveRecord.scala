@@ -112,7 +112,7 @@ trait CompanionActiveRecord[T <: Product with ActiveRecord[T]]{
  *      nomes estão corretos e todos pertencem ao objeto que está sendo atualizado)
  *   3. Não suporta Enums
  */
-trait ActiveRecord[T <: Product with ActiveRecord[T]] extends ReflectionSugars { this: T =>
+trait ActiveRecord[T <: Product with ActiveRecord[T]] extends ReflectionSugars with Validators { this: T =>
   
   /**
    * Deve ser implementada nas subclasses de forma que garanta um estado válido.
@@ -125,7 +125,7 @@ trait ActiveRecord[T <: Product with ActiveRecord[T]] extends ReflectionSugars {
   validate()
   
   private var _id:Option[Long] = _
-  private[models] def id_=(theId:Option[Long]){if(_id==null)this._id = theId}
+  private[models] def id_=(theId:Option[Long]){if(_id!=null){throw new DeveloperException("It is not allowed to sets the id twice!")}else{this._id = theId}}
   def id = _id
   
   // Companion
@@ -141,3 +141,4 @@ trait ActiveRecord[T <: Product with ActiveRecord[T]] extends ReflectionSugars {
   def delete()(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], typeTag:ru.TypeTag[T], ec:ExecutionContext):Future[Unit] = companion.delete(this.id.getOrElse(throw new RuntimeException("Are you trying to delete an already deleted record or a detached yet object?")))
 
 }
+class DeveloperException(msg:String) extends Exception(msg)
