@@ -25,14 +25,16 @@ trait CompanionActiveRecord[T <: Product with ActiveRecord[T]]{
 	def findById(id:Any)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], ec:ExecutionContext):Future[Option[T]] = Future{db.v(id).map(fromVertex(_))}
 	def apply(id:Any)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], ec:ExecutionContext):Future[Option[T]] = findById(id)
 	def apply(vertex:Vertex)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T]):T = fromVertex(vertex)
-	// TODO 1: Usar uma Exception mais apropriada
-	// TODO 2: Melhorar mensagem
-	private def findVertex(id:Any)(implicit db:ScalaGraph[TitanTransaction], ec:ExecutionContext) = Future{db.v(id).getOrElse(throw new RuntimeException("Record not found!"))}
   private def fromVertex(vertex:Vertex)(implicit m:Marshallable[T]):T = {
     val model = vertex.toCC[T]
     model.id = Some(vertex.id.asInstanceOf[Number].longValue())
     model
   }
+	// TODO 1: Usar uma Exception mais apropriada
+	// TODO 2: Melhorar mensagem
+	// TODO 3: Este método deve ser privado no Companion (objeto que estende esta trait)! Para isso a implementação deve ser feita através de macro annotations 
+	// (Por enquanto está publico para que possa ser a case class tenha acesso a ela.)
+	def findVertex(id:Any)(implicit db:ScalaGraph[TitanTransaction], ec:ExecutionContext) = Future{db.v(id).getOrElse(throw new RuntimeException("Record not found!"))}
 	
 	def create(model:T) (implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], typeTag:ru.TypeTag[T], ec:ExecutionContext):Future[T] = {
 	  for{
@@ -130,6 +132,7 @@ trait ActiveRecord[T <: Product with ActiveRecord[T]] extends ReflectionSugars w
   
   // Companion
   // TODO: Usar Macro Annotations para criar o companion object e sua implementação inicial!
+  // TODO: Outro motivo para usar as Macro Annotations é que os métodos privados "implementados" no companion ficam visíveis para o case class
   private[this] var _companion: CompanionActiveRecord[T] = _
   protected[models] def companion(implicit typeTag:ru.TypeTag[T]):CompanionActiveRecord[T] = {
 	  if(_companion == null) _companion = companionOf[T].asInstanceOf[CompanionActiveRecord[T]]
