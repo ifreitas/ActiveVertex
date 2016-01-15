@@ -1,6 +1,7 @@
 package models
 
 import java.util.Date
+import scala.concurrent.blocking
 import scala.reflect.runtime.{universe => ru}
 import org.apache.tinkerpop.gremlin.structure.Vertex
 import com.thinkaurelius.titan.core.TitanTransaction
@@ -22,7 +23,7 @@ trait ReflectionSugars{
 }
 
 trait CompanionActiveRecord[T <: Product with ActiveRecord[T]]{
-	def findById(id:Any)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], ec:ExecutionContext):Future[Option[T]] = Future{db.v(id).map(fromVertex(_))}
+	def findById(id:Any)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], ec:ExecutionContext):Future[Option[T]] = Future{blocking{db.v(id).map(fromVertex(_))}}
 	def apply(id:Any)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], ec:ExecutionContext):Future[Option[T]] = findById(id)
 	def apply(vertex:Vertex)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T]):T = fromVertex(vertex)
   private def fromVertex(vertex:Vertex)(implicit m:Marshallable[T]):T = {
@@ -34,7 +35,7 @@ trait CompanionActiveRecord[T <: Product with ActiveRecord[T]]{
 	// TODO 2: Melhorar mensagem
 	// TODO 3: Este método deve ser privado no Companion (objeto que estende esta trait)! Para isso a implementação deve ser feita através de macro annotations 
 	// (Por enquanto está publico para que possa ser a case class tenha acesso a ela.)
-	def findVertex(id:Any)(implicit db:ScalaGraph[TitanTransaction], ec:ExecutionContext) = Future{db.v(id).getOrElse(throw new RuntimeException("Record not found!"))}
+	def findVertex(id:Any)(implicit db:ScalaGraph[TitanTransaction], ec:ExecutionContext) = Future{blocking{db.v(id).getOrElse(throw new RuntimeException("Record not found!"))}}
 	
 	def create(model:T) (implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], typeTag:ru.TypeTag[T], ec:ExecutionContext):Future[T] = {
 	  for{
@@ -49,7 +50,9 @@ trait CompanionActiveRecord[T <: Product with ActiveRecord[T]]{
     }
 	}
 	private def doCreate(model: T)(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], typeTag:ru.TypeTag[T], ec: ExecutionContext):Future[Vertex] = Future {
-	  db.addVertex[T](model)
+	  blocking{
+	    db.addVertex[T](model)
+	  }
   }
 
   /**
@@ -73,11 +76,13 @@ trait CompanionActiveRecord[T <: Product with ActiveRecord[T]]{
   }
   private def doUpdate(vertex:Vertex, properties:Map[String, Any])(implicit db:ScalaGraph[TitanTransaction], m:Marshallable[T], typeTag:ru.TypeTag[T], ec: ExecutionContext):Future[Unit] = Future {
     //TODO certificar que todos os 'key' do 'properties' estão presentes no vertex antes de setá-los neste.
-    for((k,v)<-properties){
-      v match {
-        case None        => vertex.property(k).remove
-        case Some(value) => vertex.property(k, value)
-        case value       => vertex.property(k, value)
+    blocking{
+      for((k,v)<-properties){
+        v match {
+          case None        => vertex.property(k).remove
+          case Some(value) => vertex.property(k, value)
+          case value       => vertex.property(k, value)
+        }
       }
     }
   }
@@ -86,7 +91,7 @@ trait CompanionActiveRecord[T <: Product with ActiveRecord[T]]{
     for{
       vertex <- findVertex(id) // TODO: Caso nao encontre o vertex: "are you trying to delete an already deleted record?"
     	_ <- beforeDelete(db, vertex)
-    	_ <- Future{vertex.remove}
+    	_ <- Future{blocking{vertex.remove}}
     	_ <- afterDelete(db)
     }yield{()}
   }
